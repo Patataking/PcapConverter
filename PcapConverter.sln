@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33213.308
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PcapConverter", "PcapConverter\PcapConverter.csproj", "{27364C61-8BB0-4FA9-9B0E-7DD3634C007F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{27364C61-8BB0-4FA9-9B0E-7DD3634C007F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27364C61-8BB0-4FA9-9B0E-7DD3634C007F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27364C61-8BB0-4FA9-9B0E-7DD3634C007F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27364C61-8BB0-4FA9-9B0E-7DD3634C007F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {797E798D-6180-4D37-A446-45C668430254}
+	EndGlobalSection
+EndGlobal
