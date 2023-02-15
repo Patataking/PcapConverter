@@ -1,10 +1,13 @@
 ﻿using System.IO;
+using System.Runtime.InteropServices;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace PcapConverter
 {
     internal class Program
     {
+        static int errors = 0;
+
         static readonly string workingDirectory = Environment.CurrentDirectory;
         static readonly string projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName + "\\data\\";
         static void Main(string[] args)
@@ -33,7 +36,7 @@ namespace PcapConverter
             //CreateCsvFiles(inputPath);
 
 
-            /*
+            
             var directories = Directory.GetDirectories(inputPath).ToList();
             directories.ForEach(directoryPath =>
             {
@@ -41,9 +44,11 @@ namespace PcapConverter
                 // Write all deltas separated by newlines to file
                 System.IO.File.WriteAllLines(outputFilePath, PcapsFromFolderToDeltas(directoryPath));
             });
-            */
-            var counts = ValidatePcaps(inputPath);
-            Console.WriteLine(counts);
+
+            Console.WriteLine($"Invalid .pcap: {errors}");
+            
+            //var counts = ValidatePcaps(inputPath);
+            //Console.WriteLine(counts);
         }
 
         /// <summary>
@@ -109,16 +114,21 @@ namespace PcapConverter
         }
 
         public static List<string> PcapsFromFolderToDeltas(string folder)
-        {
-            List<string> timeDeltas = new();
+        {            
             // Get all files in data directory and calculate time deltas
-            Directory.GetFiles(folder).ToList().ForEach(f => timeDeltas.Add(PcapToDelta(f)));
-            
-            return timeDeltas;
+            List<int?> deltas = new();
+            Directory.GetFiles(folder).ToList().ForEach(f => deltas.Add(PcapToDelta(f)));
+            var timeDeltas = from delta in deltas
+                                      where delta.HasValue
+                                      select delta.Value.ToString();
+
+            return timeDeltas.ToList();
         }
 
-        public static string PcapToDelta(string path)
+        public static int? PcapToDelta(string path)
         {
+            int? res = null;
+
             List<Package> packageList = File.ReadAllLines(path)
                                            .Select(v => Package.FromCsv(v))
                                            .ToList();
@@ -130,8 +140,12 @@ namespace PcapConverter
                              where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
                              select package;
 
-            int res = GetDelta(startPackage.Last(), endPackage.Last());
-            return res.ToString();
+            if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Id == 4 && endPackage.First().Id == 8)
+            {
+                res = GetDelta(startPackage.Last(), endPackage.Last());
+            } else { errors++; }
+                        
+            return res;
         }
 
         public static int GetDelta(Package startPackage, Package endPackage)
