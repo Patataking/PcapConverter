@@ -1,4 +1,7 @@
-﻿namespace PcapConverter
+﻿using System.IO;
+using static System.Net.Mime.MediaTypeNames;
+
+namespace PcapConverter
 {
     internal class Program
     {
@@ -27,6 +30,10 @@
             // Print data directory
             Console.WriteLine("Output directory:\t" + outputPath);
 
+            //CreateCsvFiles(inputPath);
+
+
+            /*
             var directories = Directory.GetDirectories(inputPath).ToList();
             directories.ForEach(directoryPath =>
             {
@@ -34,7 +41,71 @@
                 // Write all deltas separated by newlines to file
                 System.IO.File.WriteAllLines(outputFilePath, PcapsFromFolderToDeltas(directoryPath));
             });
-            
+            */
+            var counts = ValidatePcaps(inputPath);
+            Console.WriteLine(counts);
+        }
+
+        /// <summary>
+        /// Does not work!
+        /// </summary>
+        /// <param name="inputFolder"></param>
+        public static void CreateCsvFiles(string inputFolder)
+        {
+            System.Diagnostics.ProcessStartInfo startInfo = new()
+            {
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                FileName = "cmd.exe"
+            };
+
+            var subFolders = Directory.GetDirectories(inputFolder).ToList();
+            subFolders.ForEach(folderPath =>
+            {
+                var folderName = folderPath.Split('\\').Last();
+                var files = Directory.GetFiles(folderPath).ToList();
+
+                files.ForEach(file =>
+                {
+                var csvPath = projectDirectory + "tmp\\" + file.Split('\\').Last();
+                //System.Diagnostics.Process.Start("CMD.exe", $"tshark - r {file} > {csvPath}");
+                startInfo.Arguments = $"tshark - r {file} > {csvPath}";
+                System.Diagnostics.Process.Start(startInfo);
+                });
+            });
+        }
+
+        public static List<Tuple<string, int, int>> ValidatePcaps(string path)
+        {
+            var result = new List<Tuple<string, int, int>>();            
+
+
+            var directories = Directory.GetDirectories(path).ToList();
+            directories.ForEach(directoryPath =>
+            {
+                var helloPackages = new List<Package>();
+                var clientKeyExchangePackages = new List<Package>();
+
+                Directory.GetFiles(directoryPath).ToList().ForEach(file =>
+                {
+                    List<Package> packageList = File.ReadAllLines(file)
+                                               .Select(v => Package.FromCsv(v))
+                                               .ToList();
+
+                    var startPackage = from package in packageList
+                                       where package.Info.Equals("TLSv1 375 Client Hello")
+                                       select package;
+                    var endPackage = from package in packageList
+                                     where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
+                                     select package;
+
+                    helloPackages.AddRange(startPackage);
+                    clientKeyExchangePackages.AddRange(endPackage);
+                });
+
+                result.Add(new Tuple<string, int, int>(directoryPath ,helloPackages.Count, clientKeyExchangePackages.Count));
+            });
+
+            return result;
         }
 
         public static List<string> PcapsFromFolderToDeltas(string folder)
