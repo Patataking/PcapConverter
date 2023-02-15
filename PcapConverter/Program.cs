@@ -36,13 +36,26 @@ namespace PcapConverter
             //CreateCsvFiles(inputPath);
 
 
-            
+            var deltas = new List<string>();
+
             var directories = Directory.GetDirectories(inputPath).ToList();
             directories.ForEach(directoryPath =>
             {
                 var outputFilePath = outputPath + directoryPath.Split('\\').Last() + ".txt";
                 // Write all deltas separated by newlines to file
-                System.IO.File.WriteAllLines(outputFilePath, PcapsFromFolderToDeltas(directoryPath));
+                // System.IO.File.WriteAllLines(outputFilePath, PcapsFromFolderToDeltas(directoryPath));
+                deltas.AddRange(PcapsFromFolderToDeltas(directoryPath));
+            });
+
+            Console.WriteLine(deltas.Count);
+            
+
+            var dataSets = deltas.Partition(10000);
+            int i= 0;
+            dataSets.ForEach(dataSet =>
+            {
+                System.IO.File.WriteAllLines(outputPath + $"\\{i}.txt", dataSet);
+                i++;
             });
 
             Console.WriteLine($"Invalid .pcap: {errors}");
@@ -50,6 +63,7 @@ namespace PcapConverter
             //var counts = ValidatePcaps(inputPath);
             //Console.WriteLine(counts);
         }
+
 
         /// <summary>
         /// Does not work!
@@ -172,6 +186,16 @@ namespace PcapConverter
             string[] values = csvLine.TrimStart().Replace("    ", "\t").Replace("   ", "\t").Split('\t');
             Package package = new(values[0], values[1], values[3]);
             return package;
+        }
+    }
+    public static class Extensions
+    {
+        public static List<List<T>> Partition<T>(this List<T> values, int chunkSize)
+        {
+            return values.Select((x, i) => new { Index = i, Value = x })
+                .GroupBy(x => x.Index / chunkSize)
+                .Select(x => x.Select(v => v.Value).ToList())
+                .ToList();
         }
     }
 }
