@@ -10,7 +10,7 @@ namespace PcapConverter
 
         static readonly string workingDirectory = Environment.CurrentDirectory;
         static readonly string projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName + "\\data\\";
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Enter input path");
             var inputPath = @"" + Console.ReadLine();
@@ -39,14 +39,29 @@ namespace PcapConverter
             var deltas = new List<string>();
 
             var directories = Directory.GetDirectories(inputPath).ToList();
-            directories.Reverse();
-            directories.ForEach(directoryPath =>
+
+            var tasks = new List<Task<List<string>>>();
+
+            /*directories.ForEach(directoryPath =>
             {
                 var outputFilePath = outputPath + directoryPath.Split('\\').Last() + ".txt";
                 // Write all deltas separated by newlines to file
                 // System.IO.File.WriteAllLines(outputFilePath, PcapsFromFolderToDeltas(directoryPath));
                 deltas.AddRange(PcapsFromFolderToDeltas(directoryPath));
+            });*/
+
+            directories.ForEach(directoryPath =>
+            {
+                var outputFilePath = outputPath + directoryPath.Split('\\').Last() + ".txt";
+                tasks.Add(PcapsFromFolderToDeltasAsync(directoryPath));
             });
+
+            while (tasks.Any())
+            {
+                Task<List<string>> finishedTask = await Task.WhenAny(tasks);
+                tasks.Remove(finishedTask);
+                deltas.AddRange( await finishedTask);
+            }
 
             Console.WriteLine(deltas.Count);
             
@@ -141,6 +156,19 @@ namespace PcapConverter
             var timeDeltas = from delta in deltas
                                       where delta.HasValue
                                       select delta.Value.ToString();
+
+            return timeDeltas.ToList();
+        }
+
+        public static async Task<List<string>> PcapsFromFolderToDeltasAsync(string folder)
+        {
+            Console.WriteLine($"Current Folder: {folder}");
+            // Get all files in data directory and calculate time deltas
+            List<double?> deltas = new();
+            await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(PcapToDelta(f))));
+            var timeDeltas = from delta in deltas
+                             where delta.HasValue
+                             select delta.Value.ToString();
 
             return timeDeltas.ToList();
         }
