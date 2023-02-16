@@ -52,7 +52,7 @@ namespace PcapConverter
             
 
             var dataSets = deltas.Partition(10000);
-            int i = 0;
+            int i = 1;
             dataSets.ForEach(dataSet =>
             {
                 if (dataSet.Count == 10000)
@@ -136,7 +136,7 @@ namespace PcapConverter
         {
             Console.WriteLine($"Current Folder: {folder}");
             // Get all files in data directory and calculate time deltas
-            List<int?> deltas = new();
+            List<double?> deltas = new();
             Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(PcapToDelta(f)));
             var timeDeltas = from delta in deltas
                                       where delta.HasValue
@@ -145,9 +145,9 @@ namespace PcapConverter
             return timeDeltas.ToList();
         }
 
-        public static int? PcapToDelta(string path)
+        public static double? PcapToDelta(string path)
         {
-            int? res = null;
+            double? res = null;
 
             List<Package> packageList = File.ReadAllLines(path)
                                            .Select(v => Package.FromCsv(v))
@@ -168,7 +168,7 @@ namespace PcapConverter
             return res;
         }
 
-        public static int GetDelta(Package startPackage, Package endPackage)
+        public static double GetDelta(Package startPackage, Package endPackage)
         {
             return endPackage.TimeDelta - startPackage.TimeDelta;
         }
@@ -177,7 +177,7 @@ namespace PcapConverter
     public class Package
     {
         public int Id { get; set; }
-        public int TimeDelta { get; set; }
+        public double TimeDelta { get; set; }
         public string Info { get; set; }
 
         public Package(string id, string timeDelta, string info)
