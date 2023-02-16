@@ -39,6 +39,7 @@ namespace PcapConverter
             var deltas = new List<string>();
 
             var directories = Directory.GetDirectories(inputPath).ToList();
+            directories.Reverse();
             directories.ForEach(directoryPath =>
             {
                 var outputFilePath = outputPath + directoryPath.Split('\\').Last() + ".txt";
@@ -51,15 +52,19 @@ namespace PcapConverter
             
 
             var dataSets = deltas.Partition(10000);
-            int i= 0;
+            int i = 0;
             dataSets.ForEach(dataSet =>
             {
-                System.IO.File.WriteAllLines(outputPath + $"\\{i}.txt", dataSet);
-                i++;
+                if (dataSet.Count == 10000)
+                {
+                    System.IO.File.WriteAllLines(outputPath + $"\\{i}.txt", dataSet);
+                    i++;
+                };                
             });
 
             Console.WriteLine($"Invalid .pcap: {errors}");
-            
+            Console.WriteLine($"Written datasets: {i-1}");
+
             //var counts = ValidatePcaps(inputPath);
             //Console.WriteLine(counts);
         }
@@ -128,10 +133,11 @@ namespace PcapConverter
         }
 
         public static List<string> PcapsFromFolderToDeltas(string folder)
-        {            
+        {
+            Console.WriteLine($"Current Folder: {folder}");
             // Get all files in data directory and calculate time deltas
             List<int?> deltas = new();
-            Directory.GetFiles(folder).ToList().ForEach(f => deltas.Add(PcapToDelta(f)));
+            Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(PcapToDelta(f)));
             var timeDeltas = from delta in deltas
                                       where delta.HasValue
                                       select delta.Value.ToString();
@@ -184,8 +190,12 @@ namespace PcapConverter
         public static Package FromCsv(string csvLine)
         {
             string[] values = csvLine.TrimStart().Replace("    ", "\t").Replace("   ", "\t").Split('\t');
-            Package package = new(values[0], values[1], values[3]);
-            return package;
+            if (values.Length == 4)
+            {
+
+                return new(values[0], values[1], values[3]);
+            }            
+            return new("-1", "0.0", "Malformed Package");
         }
     }
     public static class Extensions
