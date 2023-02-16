@@ -7,7 +7,7 @@ namespace PcapConverter
     internal class Program
     {
         static int errors = 0;
-
+        static bool isUnpatched = true;
         static readonly string workingDirectory = Environment.CurrentDirectory;
         static readonly string projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName + "\\data\\";
         static async Task Main(string[] args)
@@ -22,6 +22,12 @@ namespace PcapConverter
 
             Console.WriteLine("Enter output path");
             var outputPath = @"" + Console.ReadLine();
+
+            Console.WriteLine("Enter p for patched Version");
+            if (Console.ReadLine().Equals('p'))
+            {
+                isUnpatched = false;
+            }
 
             if (!Directory.Exists(outputPath))
             {
@@ -181,12 +187,28 @@ namespace PcapConverter
                                            .Select(v => Package.FromCsv(v))
                                            .ToList();
 
-            var startPackage = from package in packageList
-                               where package.Info.Equals("TLSv1 375 Client Hello")
-                               select package;
-            var endPackage = from package in packageList
-                             where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
-                             select package;
+
+            IEnumerable<Package> startPackage;
+            IEnumerable<Package> endPackage;
+
+            if (isUnpatched)
+            {
+                startPackage = from package in packageList
+                                   where package.Info.Equals("TLSv1 379 Client Hello")
+                                   select package;
+                endPackage = from package in packageList
+                                 where package.Info.StartsWith("TLSv1.2 198 Client Key Exchange")
+                                 select package;
+            }
+            else
+            {
+                endPackage = from package in packageList
+                                 where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
+                                 select package;
+                startPackage = from package in packageList
+                                   where package.Info.Equals("TLSv1 375 Client Hello")
+                                   select package;
+            }            
 
             if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Id == 4 && endPackage.First().Id == 8)
             {
