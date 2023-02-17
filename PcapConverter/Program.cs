@@ -9,7 +9,6 @@ namespace PcapConverter
         static int errors = 0;
         static bool isUnpatched = true;
         static readonly string workingDirectory = Environment.CurrentDirectory;
-        static readonly string projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName + "\\data\\";
         static async Task Main(string[] args)
         {
             Console.WriteLine("Enter input path");
@@ -90,35 +89,7 @@ namespace PcapConverter
             //var counts = ValidatePcaps(inputPath);
             //Console.WriteLine(counts);
         }
-
-
-        /// <summary>
-        /// Does not work!
-        /// </summary>
-        /// <param name="inputFolder"></param>
-        public static void CreateCsvFiles(string inputFolder)
-        {
-            System.Diagnostics.ProcessStartInfo startInfo = new()
-            {
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                FileName = "cmd.exe"
-            };
-
-            var subFolders = Directory.GetDirectories(inputFolder).ToList();
-            subFolders.ForEach(folderPath =>
-            {
-                var folderName = folderPath.Split('\\').Last();
-                var files = Directory.GetFiles(folderPath).ToList();
-
-                files.ForEach(file =>
-                {
-                var csvPath = projectDirectory + "tmp\\" + file.Split('\\').Last();
-                //System.Diagnostics.Process.Start("CMD.exe", $"tshark - r {file} > {csvPath}");
-                startInfo.Arguments = $"tshark - r {file} > {csvPath}";
-                System.Diagnostics.Process.Start(startInfo);
-                });
-            });
-        }
+                
 
         public static List<Tuple<string, int, int>> ValidatePcaps(string path)
         {
