@@ -24,7 +24,8 @@ namespace PcapConverter
             var outputPath = @"" + Console.ReadLine();
 
             Console.WriteLine("Enter p for patched Version");
-            if (Console.ReadLine().Equals('p'))
+            var inp = @"" + Console.ReadLine();
+            if (inp.Equals("p"))
             {
                 isUnpatched = false;
             }
@@ -202,12 +203,12 @@ namespace PcapConverter
             }
             else
             {
+                startPackage = from package in packageList
+                               where package.Info.Equals("TLSv1 375 Client Hello")
+                               select package;
                 endPackage = from package in packageList
                                  where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
-                                 select package;
-                startPackage = from package in packageList
-                                   where package.Info.Equals("TLSv1 375 Client Hello")
-                                   select package;
+                                 select package;                
             }            
 
             if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Id == 4 && endPackage.First().Id == 8)
