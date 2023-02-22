@@ -50,16 +50,16 @@ namespace PcapConverter
 
             // Get all subdirectories of input directory
             var directories = Directory.GetDirectories(inputPath).ToList();
-
-            var deltas = new List<string>();
             var tasks = new List<Task<List<string>>>();
 
             // Go through all subdirectories & start a task for each to calculate deltas from .pcap files.
             directories.ForEach(directoryPath =>
             {
 
-                tasks.Add(PcapsFromFolderToDeltasAsync(directoryPath));
+                tasks.Add(CsvFromFolderToDeltasAsync(directoryPath));
             });
+
+            var deltas = new List<string>();
 
             while (tasks.Any())
             {
@@ -102,7 +102,7 @@ namespace PcapConverter
             Console.WriteLine($"Current Folder: {folder}");
             // Get all deltas using optional double. If a .pcap is erroneous save null.
             List<double?> deltas = new();
-            Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(PcapToDelta(f)));
+            Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(CsvToDelta(f)));
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
@@ -113,15 +113,15 @@ namespace PcapConverter
         }
 
         /// <summary>
-        /// Calculate all time deltas from any amount of .pcap files in a specified folder asynchronously
+        /// Calculate all time deltas from any amount of .csv files in a specified folder asynchronously
         /// </summary>
         /// <param name="folder">The path to the folder</param>
         /// <returns>A Task to calculate a list of strings containing the time deltas</returns>
-        public static async Task<List<string>> PcapsFromFolderToDeltasAsync(string folder)
+        public static async Task<List<string>> CsvFromFolderToDeltasAsync(string folder)
         {
-            // Get all deltas using optional double. If a .pcap is erroneous save null.
+            // Get all deltas using optional double. If a .csv is erroneous save null.
             List<double?> deltas = new();
-            await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(PcapToDelta(f))));
+            await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(CsvToDelta(f))));
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
@@ -133,11 +133,11 @@ namespace PcapConverter
         }
 
         /// <summary>
-        /// Calculates the timedelta from a .pcap file
+        /// Calculates the timedelta from a .csv file
         /// </summary>
         /// <param name="path"></param>
-        /// <returns>A double if the .pcap is valid or null if it's malformed.</returns>
-        public static double? PcapToDelta(string path)
+        /// <returns>A double if the .csv is valid or null if it's malformed.</returns>
+        public static double? CsvToDelta(string path)
         {
             double? res = null;
 
