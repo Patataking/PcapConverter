@@ -149,7 +149,7 @@ namespace PcapConverter
             IEnumerable<Package> startPackage;
             IEnumerable<Package> endPackage;
 
-            // depending on the version the info column slightly varies.
+            // depending on the version the info column slightly varies due to different package sizes.
             if (isUnpatched)
             {
                 startPackage = from package in packageList
