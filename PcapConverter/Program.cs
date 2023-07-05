@@ -1,6 +1,6 @@
 ﻿
 namespace PcapConverter
-{    
+{
     internal class Program
     {
         // Amount of erroneous .pcap files
@@ -39,7 +39,7 @@ namespace PcapConverter
             if (inp.Equals("p"))
             {
                 isUnpatched = false;
-            }            
+            }
 
             // Print data directory
             Console.WriteLine("Input directory:\t" + inputPath);
@@ -68,11 +68,11 @@ namespace PcapConverter
                 // Remove finished task from task list
                 tasks.Remove(finishedTask);
                 // Add result of finished task to list of deltas
-                deltas.AddRange( await finishedTask);
+                deltas.AddRange(await finishedTask);
             }
 
             // Output amount of deltas
-            Console.WriteLine(deltas.Count);            
+            Console.WriteLine(deltas.Count);
 
             // Split deltas into subsets of 10000
             var dataSets = deltas.Partition(10000);
@@ -84,14 +84,14 @@ namespace PcapConverter
                 {
                     System.IO.File.WriteAllLines(outputPath + $"\\{i}.txt", dataSet);
                     i++;
-                };                
+                };
             });
 
             Console.WriteLine($"Invalid .pcap files: {errors}");
-            Console.WriteLine($"Written datasets: {i-1}");
+            Console.WriteLine($"Written datasets: {i - 1}");
             Console.WriteLine($"Dropped deltas: {deltas.Count % 10000}");
         }
-             
+
         /// <summary>
         /// Calculate all time deltas from any amount of .pcap files in a specified folder
         /// </summary>
@@ -106,8 +106,8 @@ namespace PcapConverter
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
-                                      where delta.HasValue
-                                      select delta.Value.ToString();
+                             where delta.HasValue
+                             select delta.Value.ToString();
 
             return timeDeltas.ToList();
         }
@@ -149,15 +149,21 @@ namespace PcapConverter
             IEnumerable<Package> startPackage;
             IEnumerable<Package> endPackage;
 
+
+            if (!ValidatePcapTimeDelta(packageList))
+            {
+                return res;
+            }
+
             // depending on the version the info column slightly varies due to different package sizes.
             if (isUnpatched)
             {
                 startPackage = from package in packageList
-                                   where package.Info.Equals("TLSv1 379 Client Hello")
-                                   select package;
+                               where package.Info.Equals("TLSv1 379 Client Hello")
+                               select package;
                 endPackage = from package in packageList
-                                 where package.Info.StartsWith("TLSv1.2 198 Client Key Exchange")
-                                 select package;
+                             where package.Info.StartsWith("TLSv1.2 8") && package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
+                             select package;
             }
             else
             {
@@ -165,19 +171,23 @@ namespace PcapConverter
                                where package.Info.Equals("TLSv1 375 Client Hello")
                                select package;
                 endPackage = from package in packageList
-                                 where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
-                                 select package;                
-            }            
+                             where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
+                             select package;
+            }
 
             // Check if the pcap is malformed
-            if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index == 8)
+            if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4)
             {
                 res = GetDelta(startPackage.Last(), endPackage.Last());
-            } else 
-            { 
-                errors++; 
+                if (res < 0)
+                {
+                    errors++;
+                }
+            } else
+            {
+                errors++;
             }
-                        
+
             return res;
         }
         /// <summary>
@@ -190,7 +200,22 @@ namespace PcapConverter
         {
             return endPackage.TimeDelta - startPackage.TimeDelta;
         }
+
+        ///
+        public static bool ValidatePcapTimeDelta(IEnumerable<Package> packages)
+        {
+            double elapsedTime = 0;
+            foreach (Package package in packages) {
+                if (package.TimeDelta < elapsedTime){
+                    return false;
+                }
+                elapsedTime = package.TimeDelta;
+            }
+            return true;
+        } 
+        
     }
+
 
     /// <summary>
     /// The Package class holds all relevant information from a single package in a .pcap file created by Wireshark.
