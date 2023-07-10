@@ -3,11 +3,6 @@ namespace PcapConverter
 {
     internal class Program
     {
-        
-        static int errors = 0;
-        // Flag whether the unpatched version or patched version is used. Needed to filter the packages correctly.
-        static bool isUnpatched = true;
-
         /// <summary>
         /// This program calculates time deltas from .csv files containing info from .pcap files
         /// The .csv files are created using Tshark
@@ -20,7 +15,9 @@ namespace PcapConverter
             string? inputPath;
             string? outputPath;
             string? versionInput;
+            string? modeInput;
             Version version;
+            HandshakeMode handshakeMode;
 
             // Check whether command line arguments have been supplied
             switch (args.Length)
@@ -29,6 +26,7 @@ namespace PcapConverter
                     inputPath = args[0];
                     outputPath = args[1];
                     versionInput = args[2];
+                    modeInput = args[3];
                     break;
                 default:
                 case 0:
@@ -40,8 +38,12 @@ namespace PcapConverter
                     outputPath = @"" + Console.ReadLine();
 
                     // Check input version
-                    Console.WriteLine("Enter p for patched Version");
+                    Console.WriteLine("Enter c for current Version 3.1.1 (defaults to 1.0.1j)");
                     versionInput = @"" + Console.ReadLine();
+
+                    // Check input version
+                    Console.WriteLine("Enter f for full handshake (defaults to partial)");
+                    modeInput = @"" + Console.ReadLine();
 
                     break;
             }
@@ -59,9 +61,15 @@ namespace PcapConverter
             // Check version; defaults to unpatched version
             version = versionInput switch
             {
-                "p" => Version.patched,
                 "c" => Version.current,
-                _ => Version.unpatched, //default to unpatched version
+                _ => Version.old, //default to unpatched version
+            };
+
+            // Check mode; defaults to partial handshake
+            handshakeMode = modeInput switch
+            {
+                "f" => HandshakeMode.full,
+                _ => HandshakeMode.partial, //default to unpatched version
             };
 
             // Print input data directory
@@ -71,7 +79,7 @@ namespace PcapConverter
             // Print used version
             Console.WriteLine(version);
 
-            CsvConverter converter = new(inputPath, outputPath, version);
+            CsvConverter converter = new(inputPath, outputPath, version, handshakeMode);
             (int, int, int) result = await converter.Run();
 
             Console.WriteLine($"Invalid .pcap files: {result.Item1}");

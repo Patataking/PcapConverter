@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Security.Permissions;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,9 +10,14 @@ namespace PcapConverter
 {
     enum Version
     {
-        unpatched,  // OpenSSL Version 1.0.1j
-        patched,    // OpenSSL Version 1.0.1j with a patch reintroducing a timing side channel
+        old,  // OpenSSL Version 1.0.1j
         current     // OpenSSL Version 3.1.1
+    }
+
+    enum HandshakeMode
+    {
+        partial, // only look at the part of the handshake containing the side channel
+        full
     }
 
     internal class CsvConverter
@@ -21,11 +27,13 @@ namespace PcapConverter
         private readonly string InputPath;
         private readonly string OutputPath;
         private readonly Version Version;
+        private readonly HandshakeMode HandshakeMode;
 
-        public CsvConverter(string InputPath, string OutputPath, Version Version) {
+        public CsvConverter(string InputPath, string OutputPath, Version Version, HandshakeMode handshakeMode) {
             this.InputPath = InputPath ?? throw new ArgumentNullException(nameof(InputPath));
             this.OutputPath = OutputPath ?? throw new ArgumentNullException(nameof(OutputPath));
             this.Version = Version;
+            this.HandshakeMode = handshakeMode;
         }
 
         public async Task<(int, int, int)> Run()
@@ -131,21 +139,21 @@ namespace PcapConverter
             switch (Version)
             {
                 default:
-                case Version.unpatched:
+                case Version.old:
                     startPackage = from package in packageList
                                    where package.Info.Equals("TLSv1 379 Client Hello")
                                    select package;
-                    endPackage = from package in packageList
-                                 where package.Info.StartsWith("TLSv1.2 198 Client Key Exchange")
-                                 select package;
-                    break;
-                case Version.patched:
-                    startPackage = from package in packageList
-                                   where package.Info.Equals("TLSv1 375 Client Hello")
-                                   select package;
-                    endPackage = from package in packageList
-                                 where package.Info.StartsWith("TLSv1.2 194 Client Key Exchange")
-                                 select package;
+                    if (HandshakeMode == HandshakeMode.partial)
+                    {                        
+                        endPackage = from package in packageList
+                                     where package.Info.StartsWith("TLSv1.2 8") && package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
+                                     select package;
+                    } else
+                    {                        
+                        endPackage = from package in packageList
+                                     where package.Info.Equals("TLSv1.2 298 New Session Ticket, Change Cipher Spec, Encrypted Handshake Message")
+                                     select package;
+                    }                    
                     break;
                 case Version.current: // TODO
                     startPackage = new List<Package>(); 
@@ -155,9 +163,14 @@ namespace PcapConverter
             }
 
             // Check if the pcap is malformed
-            if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index == 8)
+            if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4)
             {
                 res = GetDelta(startPackage.Last(), endPackage.Last());
+                if (res < 0)
+                {
+                    res = null;
+                    errors++;
+                }
             }
             else
             {
@@ -175,6 +188,28 @@ namespace PcapConverter
         public static double GetDelta(Package startPackage, Package endPackage)
         {
             return endPackage.TimeDelta - startPackage.TimeDelta;
+        }
+
+        ///<summary>
+        /// Check if the packet capture uses time deltas relative to the start of the capture.
+        /// </summary>
+        /// <param name="packages">A list of packages</param>
+        /// <returns>
+        ///     <para>TRUE, if the package capture is in correct format </para>
+        ///     <para>FALSE, if the time deltas are in relation to the previous package </para>
+        /// </returns>
+        public static bool ValidatePcapTimeDelta(IEnumerable<Package> packages)
+        {
+            double elapsedTime = 0;
+            foreach (Package package in packages)
+            {
+                if (package.TimeDelta < elapsedTime)
+                {
+                    return false;
+                }
+                elapsedTime = package.TimeDelta;
+            }
+            return true;
         }
     }
 }
