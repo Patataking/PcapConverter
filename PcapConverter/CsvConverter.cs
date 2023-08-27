@@ -141,7 +141,7 @@ namespace PcapConverter
                 default:
                 case Version.old:
                     startPackage = from package in packageList
-                                   where package.Info.Equals("TLSv1 379 Client Hello")
+                                   where package.Info.StartsWith("TLSv1") && package.Info.Contains("Client Hello")
                                    select package;
                     if (HandshakeMode == HandshakeMode.partial)
                     {                        
