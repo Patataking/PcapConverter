@@ -16,8 +16,10 @@ namespace PcapConverter
             string? outputPath;
             string? versionInput;
             string? modeInput;
+            string? networkInput;
             Version version;
             HandshakeMode handshakeMode;
+            NetworkMode networkMode;
 
             // Check whether command line arguments have been supplied
             switch (args.Length)
@@ -27,6 +29,7 @@ namespace PcapConverter
                     outputPath = args[1];
                     versionInput = args[2];
                     modeInput = args[3];
+                    networkInput = args[4];
                     break;
                 default:
                 case 0:
@@ -44,6 +47,10 @@ namespace PcapConverter
                     // Check input version
                     Console.WriteLine("Enter f for full handshake (defaults to partial)");
                     modeInput = @"" + Console.ReadLine();
+
+                    // Check input version
+                    Console.WriteLine("Enter n for network mode (defaults to local)");
+                    networkInput = @"" + Console.ReadLine();
 
                     break;
             }
@@ -65,11 +72,18 @@ namespace PcapConverter
                 _ => Version.old, //default to unpatched version
             };
 
-            // Check mode; defaults to partial handshake
+            // Check handshakemode; defaults to partial handshake
             handshakeMode = modeInput switch
             {
                 "f" => HandshakeMode.full,
                 _ => HandshakeMode.partial, //default to unpatched version
+            };
+
+            // Check networkmode; defaults to partial handshake
+            networkMode = networkInput switch
+            {
+                "n" => NetworkMode.network,
+                _ => NetworkMode.local, //default to unpatched version
             };
 
             // Print input data directory
@@ -79,7 +93,7 @@ namespace PcapConverter
             // Print used version
             Console.WriteLine(version);
 
-            CsvConverter converter = new(inputPath, outputPath, version, handshakeMode);
+            CsvConverter converter = new(inputPath, outputPath, version, handshakeMode, networkMode);
             (int, int, int) result = await converter.Run();
 
             Console.WriteLine($"Invalid .pcap files: {result.Item1}");

@@ -19,6 +19,11 @@ namespace PcapConverter
         partial, // only look at the part of the handshake containing the side channel
         full
     }
+    enum NetworkMode
+    {
+        network,
+        local
+    }
 
     internal class CsvConverter
     {
@@ -28,12 +33,15 @@ namespace PcapConverter
         private readonly string OutputPath;
         private readonly Version Version;
         private readonly HandshakeMode HandshakeMode;
+        private readonly NetworkMode NetworkMode;
 
-        public CsvConverter(string InputPath, string OutputPath, Version Version, HandshakeMode handshakeMode) {
+        public CsvConverter(string InputPath, string OutputPath, Version Version, HandshakeMode handshakeMode, NetworkMode networkMode)
+        {
             this.InputPath = InputPath ?? throw new ArgumentNullException(nameof(InputPath));
             this.OutputPath = OutputPath ?? throw new ArgumentNullException(nameof(OutputPath));
             this.Version = Version;
             this.HandshakeMode = handshakeMode;
+            this.NetworkMode = networkMode;
         }
 
         public async Task<(int, int, int)> Run()
@@ -127,11 +135,19 @@ namespace PcapConverter
         public double? CsvToDelta(string path)
         {
             double? res = null;
-
-            List<Package> packageList = File.ReadAllLines(path)
-                                           .Select(v => Package.FromCsv(v))
-                                           .ToList();
-
+            List<Package> packageList;
+            if ( NetworkMode == NetworkMode.network)
+            {
+                packageList = File.ReadAllLines(path)
+                                          .Select(v => Package.FromCsv(v, true))
+                                          .ToList();
+            }
+            else
+            {
+                packageList = File.ReadAllLines(path)
+                                          .Select(v => Package.FromCsv(v, false))
+                                          .ToList();
+            }
 
             IEnumerable<Package> startPackage;
             IEnumerable<Package> endPackage;            
@@ -159,7 +175,6 @@ namespace PcapConverter
                     startPackage = new List<Package>(); 
                     endPackage = new List<Package>();
                     break;
-
             }
 
             // Check if the pcap is malformed
