@@ -179,7 +179,7 @@ namespace PcapConverter
 
             var isValidPcap = NetworkMode switch
             {
-                NetworkMode.network => startPackage.Count() > 0 && endPackage.Count() > 0 && startPackage.First().Index == 4 && endPackage.First().Index > 4,
+                NetworkMode.network => startPackage.Any() && endPackage.Any() && startPackage.First().Index == 4 && endPackage.First().Index > 4,
                 _ => startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4,
             };
 
