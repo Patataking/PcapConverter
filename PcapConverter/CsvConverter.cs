@@ -162,7 +162,7 @@ namespace PcapConverter
                     if (HandshakeMode == HandshakeMode.partial)
                     {                        
                         endPackage = from package in packageList
-                                     where package.Info.StartsWith("TLSv1.2 8") && package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
+                                     where package.Info.StartsWith("TLSv1.2") && package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
                                      select package;
                     } else
                     {                        
