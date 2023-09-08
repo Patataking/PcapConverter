@@ -97,7 +97,7 @@ namespace PcapConverter
             Console.WriteLine($"Current Folder: {folder}");
             // Get all deltas using optional double. If a .pcap is erroneous save null.
             List<double?> deltas = new();
-            Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(CsvToDelta(f)));
+            Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f)));
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
@@ -116,7 +116,7 @@ namespace PcapConverter
         {
             // Get all deltas using optional double. If a .csv is erroneous save null.
             List<double?> deltas = new();
-            await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.Add(CsvToDelta(f))));
+            await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f))));
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
@@ -132,9 +132,9 @@ namespace PcapConverter
         /// </summary>
         /// <param name="path"></param>
         /// <returns>A double if the .csv is valid or null if it's malformed.</returns>
-        public double? CsvToDelta(string path)
+        public List<double?> CsvToDelta(string path)
         {
-            double? res = null;
+            List<double?> resList = new List<double?>();
             List<Package> packageList;
             if ( NetworkMode == NetworkMode.network)
             {
@@ -190,11 +190,14 @@ namespace PcapConverter
                 {
                     try
                     {
-                        res = GetDelta(startPackage.ElementAt(i), endPackage.ElementAt(i));
-                        if (res < 0)
-                        {
-                            res = null;
+                        var resTemp = GetDelta(startPackage.ElementAt(i), endPackage.ElementAt(i));
+                        if (resTemp < 0)
+                        {                            
                             errors++;
+                        }
+                        else
+                        {
+                            resList.Add(resTemp);
                         }
                     }
                     catch
@@ -210,7 +213,7 @@ namespace PcapConverter
                 errors++;
             }
             
-            return res;
+            return resList;
         }
         /// <summary>
         /// Calculate the elapsed time between 2 packages.
