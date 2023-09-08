@@ -177,10 +177,24 @@ namespace PcapConverter
                     break;
             }
 
-            // Check if the pcap is malformed
-            if (startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4)
+
+            bool isValidPcap;
+
+            switch (NetworkMode)
             {
-                res = GetDelta(startPackage.Last(), endPackage.Last());
+                case NetworkMode.network:
+                    isValidPcap = startPackage.First().Index == 4 && endPackage.First().Index > 4;
+                    break;
+                default:
+                case NetworkMode.local:
+                    isValidPcap = startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4;
+                    break;
+            }
+
+            // Check if the pcap is malformed
+            if (isValidPcap)
+            {
+                res = GetDelta(startPackage.First(), endPackage.First());
                 if (res < 0)
                 {
                     res = null;
