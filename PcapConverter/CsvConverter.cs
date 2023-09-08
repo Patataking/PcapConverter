@@ -177,29 +177,33 @@ namespace PcapConverter
                     break;
             }
 
-
-            bool isValidPcap;
-
-            switch (NetworkMode)
+            var isValidPcap = NetworkMode switch
             {
-                case NetworkMode.network:
-                    isValidPcap = startPackage.First().Index == 4 && endPackage.First().Index > 4;
-                    break;
-                default:
-                case NetworkMode.local:
-                    isValidPcap = startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4;
-                    break;
-            }
+                NetworkMode.network => startPackage.First().Index == 4 && endPackage.First().Index > 4,
+                _ => startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4,
+            };
 
             // Check if the pcap is malformed
             if (isValidPcap)
             {
-                res = GetDelta(startPackage.First(), endPackage.First());
-                if (res < 0)
+                for (int i = 0; i < startPackage.Count(); i++)
                 {
-                    res = null;
-                    errors++;
-                }
+                    try
+                    {
+                        res = GetDelta(startPackage.ElementAt(i), endPackage.ElementAt(i));
+                        if (res < 0)
+                        {
+                            res = null;
+                            errors++;
+                        }
+                    }
+                    catch
+                    {
+                        errors++;
+                        Console.WriteLine("Pcap contains a partial connection.");
+                        Console.WriteLine("Total errors:" + errors);
+                    }
+                }                
             }
             else
             {
