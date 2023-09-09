@@ -28,7 +28,13 @@ namespace PcapConverter
     internal class CsvConverter
     {
         // Amount of erroneous .pcap files
-        int errors = 0;
+        int erroneousFiles = 0;
+        // Amount of partial connections
+        int partialConnections = 0;
+        // Amount of negative deltas
+        int negativeDeltas = 0;
+        // Amount of written datasets
+        int writtenDatasets = 0;
         private readonly string InputPath;
         private readonly string OutputPath;
         private readonly Version Version;
@@ -44,7 +50,7 @@ namespace PcapConverter
             this.NetworkMode = networkMode;
         }
 
-        public async Task<(int, int, int)> Run()
+        public async Task Run()
         {
             // Get all subdirectories of input directory
             var directories = Directory.GetDirectories(InputPath).ToList();
@@ -73,18 +79,21 @@ namespace PcapConverter
 
             // Split deltas into subsets of 10000
             var dataSets = deltas.Partition(10000);
-            int i = 1;
+            writtenDatasets = 1;
             dataSets.ForEach(dataSet =>
             {
                 // Ensure that no incomplete set is written.
                 if (dataSet.Count == 10000)
                 {
-                    System.IO.File.WriteAllLines(OutputPath + $"\\{i}.txt", dataSet);
-                    i++;
+                    System.IO.File.WriteAllLines(OutputPath + $"\\{writtenDatasets}.txt", dataSet);
+                    writtenDatasets++;
                 };
-            });           
+            });
 
-            return (errors, i - 1, deltas.Count % 10000);
+            Console.WriteLine($"Invalid .pcap files: {erroneousFiles}");
+            Console.WriteLine($"Written datasets: {writtenDatasets - 1}");
+            Console.WriteLine($"Dropped deltas: {deltas.Count() % 10000}");
+            Console.WriteLine($"Total amount of partial connections: {partialConnections}");
         }
 
         /// <summary>
@@ -96,13 +105,12 @@ namespace PcapConverter
         {
             Console.WriteLine($"Current Folder: {folder}");
             // Get all deltas using optional double. If a .pcap is erroneous save null.
-            List<double?> deltas = new();
+            List<double> deltas = new();
             Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f)));
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
-                             where delta.HasValue
-                             select delta.Value.ToString();
+                             select delta.ToString();
 
             return timeDeltas.ToList();
         }
@@ -115,13 +123,13 @@ namespace PcapConverter
         public async Task<List<string>> CsvFromFolderToDeltasAsync(string folder)
         {
             // Get all deltas using optional double. If a .csv is erroneous save null.
-            List<double?> deltas = new();
+            List<double> deltas = new();
+
             await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f))));
 
             // Remove all null entries
             var timeDeltas = from delta in deltas
-                             where delta.HasValue
-                             select delta.Value.ToString();
+                             select delta.ToString();
 
             Console.WriteLine($"Finished Folder: {folder}");
             return timeDeltas.ToList();
@@ -132,25 +140,88 @@ namespace PcapConverter
         /// </summary>
         /// <param name="path"></param>
         /// <returns>A double if the .csv is valid or null if it's malformed.</returns>
-        public List<double?> CsvToDelta(string path)
+        public List<double> CsvToDelta(string path)
         {
-            List<double?> resList = new List<double?>();
+            List<double> resList = new();
             List<Package> packageList;
-            if ( NetworkMode == NetworkMode.network)
+            
+            // Retrieve packages from file. 
+            packageList = File.ReadAllLines(path)
+                            .Select(v => Package.FromCsv(v, NetworkMode == NetworkMode.network))
+                            .ToList();
+
+            var (startPackage, endPackage) = GetStartingAndEndingPackages(packageList);
+
+            // Check if the pcap is malformed
+            if (!ValidatePcap(startPackage, endPackage))
             {
-                packageList = File.ReadAllLines(path)
-                                          .Select(v => Package.FromCsv(v, true))
-                                          .ToList();
+                erroneousFiles++;
             }
             else
             {
-                packageList = File.ReadAllLines(path)
-                                          .Select(v => Package.FromCsv(v, false))
-                                          .ToList();
+                resList.AddRange(TryGetDeltas(startPackage, endPackage));
             }
 
+            return resList;
+        }
+
+        /// <summary>
+        /// Try to get get deltas from packet capture. Allows handling of partial connections without breaking.
+        /// </summary>
+        /// <param name="startPackage"></param>
+        /// <param name="endPackage"></param>
+        /// <returns></returns>
+        public List<double> TryGetDeltas(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage)
+        {
+            List<double> resList = new();
+            for (int i = 0; i < startPackage.Count(); i++)
+            {
+                try
+                {
+                    var resTemp = GetDelta(startPackage.ElementAt(i), endPackage.ElementAt(i));
+                    if (resTemp < 0)
+                    {
+                        negativeDeltas++;
+                    }
+                    else
+                    {
+                        resList.Add(resTemp);
+                    }
+                }
+                catch
+                {
+                    partialConnections++;
+                    Console.WriteLine("Pcap contains a partial connection.");
+                }                
+            }
+            return resList;
+        }
+
+        /// <summary>
+        /// Validates the amounts and positions of packages for delta calculation
+        /// </summary>
+        /// <param name="startPackage"></param>
+        /// <param name="endPackage"></param>
+        /// <returns></returns>
+        public bool ValidatePcap(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage) => NetworkMode switch
+        {
+            NetworkMode.network =>
+                startPackage.Any() && endPackage.Any()
+                && startPackage.First().Index < endPackage.First().Index,
+            NetworkMode.local or _ =>
+                startPackage.Count() == 1 && endPackage.Count() == 1
+                && startPackage.First().Index == 4 && endPackage.First().Index > 4,
+        };
+
+        /// <summary>
+        /// Retrieves all first and last packages per server connection.
+        /// </summary>
+        /// <param name="packageList">A list of packages from a single packet capture</param>
+        /// <returns>A tuple containing (startPackages, endPackages)</returns>
+        public (IEnumerable<Package>, IEnumerable<Package>) GetStartingAndEndingPackages(List<Package> packageList)
+        {
             IEnumerable<Package> startPackage;
-            IEnumerable<Package> endPackage;            
+            IEnumerable<Package> endPackage;
 
             switch (Version)
             {
@@ -159,62 +230,26 @@ namespace PcapConverter
                     startPackage = from package in packageList
                                    where package.Info.StartsWith("TLSv1") && package.Info.Contains("Client Hello")
                                    select package;
-                    if (HandshakeMode == HandshakeMode.partial)
-                    {                        
-                        endPackage = from package in packageList
-                                     where package.Info.StartsWith("TLSv1.2") && package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
-                                     select package;
-                    } else
-                    {                        
-                        endPackage = from package in packageList
-                                     where package.Info.Equals("TLSv1.2 298 New Session Ticket, Change Cipher Spec, Encrypted Handshake Message")
-                                     select package;
-                    }                    
+                    
+                    endPackage = from package in packageList
+                                 where package.Info.StartsWith("TLSv1.2")
+                                    // The last package differs depending on whether a partial or full handshake is beeing analyzed.
+                                    && HandshakeMode switch
+                                    {                                        
+                                        HandshakeMode.full => package.Info.Contains("New Session Ticket, Change Cipher Spec, Encrypted Handshake Message"),
+                                        _ or HandshakeMode.partial => package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
+                                    }
+                                 select package;
                     break;
                 case Version.current: // TODO
-                    startPackage = new List<Package>(); 
+                    startPackage = new List<Package>();
                     endPackage = new List<Package>();
                     break;
             }
 
-            var isValidPcap = NetworkMode switch
-            {
-                NetworkMode.network => startPackage.Any() && endPackage.Any() && startPackage.First().Index < endPackage.First().Index,
-                _ => startPackage.Count() == 1 && endPackage.Count() == 1 && startPackage.First().Index == 4 && endPackage.First().Index > 4,
-            };
-
-            // Check if the pcap is malformed
-            if (isValidPcap)
-            {
-                for (int i = 0; i < startPackage.Count(); i++)
-                {
-                    try
-                    {
-                        var resTemp = GetDelta(startPackage.ElementAt(i), endPackage.ElementAt(i));
-                        if (resTemp < 0)
-                        {                            
-                            errors++;
-                        }
-                        else
-                        {
-                            resList.Add(resTemp);
-                        }
-                    }
-                    catch
-                    {
-                        errors++;
-                        Console.WriteLine("Pcap contains a partial connection.");
-                        Console.WriteLine("Total errors:" + errors);
-                    }
-                }                
-            }
-            else
-            {
-                errors++;
-            }
-            
-            return resList;
+            return (startPackage, endPackage);
         }
+
         /// <summary>
         /// Calculate the elapsed time between 2 packages.
         /// </summary>

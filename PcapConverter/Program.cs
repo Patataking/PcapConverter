@@ -94,11 +94,7 @@ namespace PcapConverter
             Console.WriteLine(version);
 
             CsvConverter converter = new(inputPath, outputPath, version, handshakeMode, networkMode);
-            (int, int, int) result = await converter.Run();
-
-            Console.WriteLine($"Invalid .pcap files: {result.Item1}");
-            Console.WriteLine($"Written datasets: {result.Item2}");
-            Console.WriteLine($"Dropped deltas: {result.Item3}");
+            await converter.Run();            
         }
     }
 }
