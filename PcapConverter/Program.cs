@@ -1,4 +1,4 @@
-﻿
+
 namespace PcapConverter
 {
     internal class Program
@@ -64,7 +64,7 @@ namespace PcapConverter
             {
                 throw new Exception("Path doesn't exist:\t" + outputPath);
             }
-
+          
             // Check version; defaults to unpatched version
             version = versionInput switch
             {
