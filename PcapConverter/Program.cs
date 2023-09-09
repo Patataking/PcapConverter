@@ -24,7 +24,7 @@ namespace PcapConverter
             // Check whether command line arguments have been supplied
             switch (args.Length)
             {
-                case 3:
+                case 4:
                     inputPath = args[0];
                     outputPath = args[1];
                     versionInput = args[2];
@@ -69,21 +69,21 @@ namespace PcapConverter
             version = versionInput switch
             {
                 "c" => Version.current,
-                _ => Version.old, //default to unpatched version
+                "o" or _ => Version.old,
             };
 
             // Check handshakemode; defaults to partial handshake
             handshakeMode = modeInput switch
             {
                 "f" => HandshakeMode.full,
-                _ => HandshakeMode.partial, //default to unpatched version
+                "p" or _ => HandshakeMode.partial,
             };
 
-            // Check networkmode; defaults to partial handshake
+            // Check networkmode; defaults to local mode
             networkMode = networkInput switch
             {
                 "n" => NetworkMode.network,
-                _ => NetworkMode.local, //default to unpatched version
+                "l" or _ => NetworkMode.local,
             };
 
             // Print input data directory
