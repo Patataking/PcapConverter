@@ -28,26 +28,26 @@ namespace PcapConverter
     internal class CsvConverter
     {
         // Amount of erroneous .pcap files
-        int erroneousFiles = 0;
+        private int erroneousFiles = 0;
         // Amount of partial connections
-        int partialConnections = 0;
+        private int partialConnections = 0;
         // Amount of negative deltas
-        int negativeDeltas = 0;
+        private int negativeDeltas = 0;
         // Amount of written datasets
-        int writtenDatasets = 0;
+        private int writtenDatasets = 0;
         private readonly string InputPath;
         private readonly string OutputPath;
         private readonly Version Version;
         private readonly HandshakeMode HandshakeMode;
         private readonly NetworkMode NetworkMode;
 
-        public CsvConverter(string InputPath, string OutputPath, Version Version, HandshakeMode handshakeMode, NetworkMode networkMode)
+        public CsvConverter(string inputPath, string outputPath, Version version, HandshakeMode handshakeMode, NetworkMode networkMode)
         {
-            this.InputPath = InputPath ?? throw new ArgumentNullException(nameof(InputPath));
-            this.OutputPath = OutputPath ?? throw new ArgumentNullException(nameof(OutputPath));
-            this.Version = Version;
-            this.HandshakeMode = handshakeMode;
-            this.NetworkMode = networkMode;
+            InputPath = inputPath ?? throw new ArgumentNullException(nameof(inputPath));
+            OutputPath = outputPath ?? throw new ArgumentNullException(nameof(outputPath));
+            Version = version;
+            HandshakeMode = handshakeMode;
+            NetworkMode = networkMode;
         }
 
         public async Task Run()
@@ -85,34 +85,16 @@ namespace PcapConverter
                 // Ensure that no incomplete set is written.
                 if (dataSet.Count == 10000)
                 {
-                    System.IO.File.WriteAllLines(OutputPath + $"\\{writtenDatasets}.txt", dataSet);
+                    File.WriteAllLines(OutputPath + $"\\{writtenDatasets}.txt", dataSet);
                     writtenDatasets++;
                 };
             });
 
             Console.WriteLine($"Invalid .pcap files: {erroneousFiles}");
             Console.WriteLine($"Written datasets: {writtenDatasets - 1}");
-            Console.WriteLine($"Dropped deltas: {deltas.Count() % 10000}");
-            Console.WriteLine($"Total amount of partial connections: {partialConnections}");
-        }
-
-        /// <summary>
-        /// Calculate all time deltas from any amount of .pcap files in a specified folder
-        /// </summary>
-        /// <param name="folder">The path to the folder</param>
-        /// <returns>A List of strings containing the time deltas</returns>
-        public List<string> PcapsFromFolderToDeltas(string folder)
-        {
-            Console.WriteLine($"Current Folder: {folder}");
-            // Get all deltas using optional double. If a .pcap is erroneous save null.
-            List<double> deltas = new();
-            Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f)));
-
-            // Remove all null entries
-            var timeDeltas = from delta in deltas
-                             select delta.ToString();
-
-            return timeDeltas.ToList();
+            Console.WriteLine($"Dropped deltas: {deltas.Count % 10000}");
+            Console.WriteLine($"Negative deltas: {negativeDeltas}");
+            Console.WriteLine($"Partial connections: {partialConnections}");
         }
 
         /// <summary>
@@ -120,9 +102,8 @@ namespace PcapConverter
         /// </summary>
         /// <param name="folder">The path to the folder</param>
         /// <returns>A Task to calculate a list of strings containing the time deltas</returns>
-        public async Task<List<string>> CsvFromFolderToDeltasAsync(string folder)
+        private async Task<List<string>> CsvFromFolderToDeltasAsync(string folder)
         {
-            // Get all deltas using optional double. If a .csv is erroneous save null.
             List<double> deltas = new();
 
             await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f))));
@@ -140,7 +121,7 @@ namespace PcapConverter
         /// </summary>
         /// <param name="path"></param>
         /// <returns>A double if the .csv is valid or null if it's malformed.</returns>
-        public List<double> CsvToDelta(string path)
+        private List<double> CsvToDelta(string path)
         {
             List<double> resList = new();
             List<Package> packageList;
@@ -171,7 +152,7 @@ namespace PcapConverter
         /// <param name="startPackage"></param>
         /// <param name="endPackage"></param>
         /// <returns></returns>
-        public List<double> TryGetDeltas(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage)
+        private List<double> TryGetDeltas(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage)
         {
             List<double> resList = new();
             for (int i = 0; i < startPackage.Count(); i++)
@@ -191,7 +172,6 @@ namespace PcapConverter
                 catch
                 {
                     partialConnections++;
-                    Console.WriteLine("Pcap contains a partial connection.");
                 }                
             }
             return resList;
@@ -203,7 +183,7 @@ namespace PcapConverter
         /// <param name="startPackage"></param>
         /// <param name="endPackage"></param>
         /// <returns></returns>
-        public bool ValidatePcap(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage) => NetworkMode switch
+        private bool ValidatePcap(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage) => NetworkMode switch
         {
             NetworkMode.network =>
                 startPackage.Any() && endPackage.Any()
@@ -218,7 +198,7 @@ namespace PcapConverter
         /// </summary>
         /// <param name="packageList">A list of packages from a single packet capture</param>
         /// <returns>A tuple containing (startPackages, endPackages)</returns>
-        public (IEnumerable<Package>, IEnumerable<Package>) GetStartingAndEndingPackages(List<Package> packageList)
+        private (IEnumerable<Package>, IEnumerable<Package>) GetStartingAndEndingPackages(List<Package> packageList)
         {
             IEnumerable<Package> startPackage;
             IEnumerable<Package> endPackage;
@@ -256,7 +236,7 @@ namespace PcapConverter
         /// <param name="startPackage"></param>
         /// <param name="endPackage"></param>
         /// <returns></returns>
-        public static double GetDelta(Package startPackage, Package endPackage)
+        private static double GetDelta(Package startPackage, Package endPackage)
         {
             return endPackage.TimeDelta - startPackage.TimeDelta;
         }
@@ -269,7 +249,7 @@ namespace PcapConverter
         ///     <para>TRUE, if the package capture is in correct format </para>
         ///     <para>FALSE, if the time deltas are in relation to the previous package </para>
         /// </returns>
-        public static bool ValidatePcapTimeDelta(IEnumerable<Package> packages)
+        private static bool ValidatePcapTimeDelta(IEnumerable<Package> packages)
         {
             double elapsedTime = 0;
             foreach (Package package in packages)
