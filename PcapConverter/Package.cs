@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace PcapConverter
+﻿namespace PcapConverter
 {
     /// <summary>
     /// The Package class holds all relevant information from a single package in a .pcap file created by Wireshark.
@@ -21,10 +15,10 @@ namespace PcapConverter
         /// </summary>
         public string Info { get; set; }
 
-        public Package(string index, string timeDelta, string info)
+        public Package(int index, double timeDelta, string info)
         {
-            Index = int.Parse(index);
-            TimeDelta = double.Parse(timeDelta);
+            Index = index;
+            TimeDelta = timeDelta;
             Info = info;
         }
 
@@ -48,9 +42,15 @@ namespace PcapConverter
             if (values.Length == 4)
             {
                 // values[0] => Index | values[1] => TimeDelta | values[3] => Info | values[2] contains multiple irrelevant columns
-                return new(values[0], values[1], values[3]);
+                try
+                {
+                    return new(int.Parse(values[0]), double.Parse(values[1]), values[3]);
+                }
+                catch(FormatException) {
+                    return new(-1, 0.0, "Malformed Package");
+                }
             }
-            return new("-1", "0.0", "Malformed Package");
+            return new(-1, 0.0, "Malformed Package");
         }
 
         /// <summary>
@@ -60,8 +60,8 @@ namespace PcapConverter
         /// <returns>A new Package object</returns>
         public static Package FromCsvNetwork(string csvLine)
         {
-            string index;
-            string timeDelta;
+            int index;
+            double timeDelta;
             string info;
             /* TShark produces irregularly malformed .csv when analyzing network traffic.
              * Due to this we need do replace all occurences of any number of consecutive spaces with a single tab character */
@@ -69,8 +69,17 @@ namespace PcapConverter
 
             if (values.Length >= 4)
             {
-                index = values[0];
-                timeDelta = values[1];
+                try
+                {
+                    index = int.Parse(values[0]);
+                    timeDelta = double.Parse(values[1]);
+                }
+                catch (FormatException)
+                {
+                    Console.WriteLine("Couldn't parse elapsed time");
+                    Console.WriteLine(values[1]);
+                    return new(-1, 0.0, "Malformed Package");
+                }
                 // We drop the Values between 2 & 4 as they are not relevant
                 info = values[5];
                 // The values from index 5 upwards contain the info field from wireshark. So we reassemble them back into a single string.
@@ -79,9 +88,10 @@ namespace PcapConverter
                     info = info + " " + values[i];
                 }
                 // values[0] => Index | values[1] => TimeDelta | values[3] => Info | values[2] contains multiple irrelevant columns
+                
                 return new(index, timeDelta, info);
             }
-            return new("-1", "0.0", "Malformed Package");
+            return new(-1, 0.0, "Malformed Package");
         }
     }
 }
