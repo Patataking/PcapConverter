@@ -1,4 +1,3 @@
-
 namespace PcapConverter
 {
     internal class Program
@@ -14,41 +13,39 @@ namespace PcapConverter
         {
             string? inputPath;
             string? outputPath;
-            string? versionInput;
+            string? tlsVersionInput;
             string? modeInput;
             string? networkInput;
-            Version version;
+            TlsVersion tlsVersion;
             HandshakeMode handshakeMode;
             NetworkMode networkMode;
 
             // Check whether command line arguments have been supplied
             switch (args.Length)
             {
+                // Handle input from command line
                 case 4:
                     inputPath = args[0];
                     outputPath = args[1];
-                    versionInput = args[2];
+                    tlsVersionInput = args[2];
                     modeInput = args[3];
                     networkInput = args[4];
                     break;
+                // In case of no command line arguments or an incorrect amount ask for input through console
                 default:
                 case 0:
-
                     Console.WriteLine("Enter input path");
                     inputPath = @"" + Console.ReadLine();
 
                     Console.WriteLine("Enter output path");
                     outputPath = @"" + Console.ReadLine();
 
-                    // Check input version
-                    Console.WriteLine("Enter c for current Version 3.1.1 (defaults to 1.0.1j)");
-                    versionInput = @"" + Console.ReadLine();
+                    Console.WriteLine("Enter 3 for TLS 1.3 (defaults to TLS 1.2)");
+                    tlsVersionInput = @"" + Console.ReadLine();
 
-                    // Check input version
                     Console.WriteLine("Enter f for full handshake (defaults to partial)");
                     modeInput = @"" + Console.ReadLine();
 
-                    // Check input version
                     Console.WriteLine("Enter n for network mode (defaults to local)");
                     networkInput = @"" + Console.ReadLine();
 
@@ -57,19 +54,19 @@ namespace PcapConverter
 
             if (!Directory.Exists(inputPath))
             {
-                throw new Exception("Path doesn't exist:\t" + inputPath);
+                throw new Exception("InputPath doesn't exist:\t" + inputPath);
             }
 
             if (!Directory.Exists(outputPath))
             {
-                throw new Exception("Path doesn't exist:\t" + outputPath);
+                throw new Exception("OutputPath doesn't exist:\t" + outputPath);
             }
-          
-            // Check version; defaults to unpatched version
-            version = versionInput switch
+
+            // Check TLS version; defaults to TLS 1.2
+            tlsVersion = tlsVersionInput switch
             {
-                "c" => Version.current,
-                "o" or _ => Version.old,
+                "3" => TlsVersion.three,
+                "2" or _ => TlsVersion.two,
             };
 
             // Check handshakemode; defaults to partial handshake
@@ -86,15 +83,16 @@ namespace PcapConverter
                 "l" or _ => NetworkMode.local,
             };
 
-            // Print input data directory
+            // Print input parameters
             Console.WriteLine("Input directory:\t" + inputPath);
-            // Print output data directory
             Console.WriteLine("Output directory:\t" + outputPath);
-            // Print used version
-            Console.WriteLine(version);
+            Console.WriteLine("TLS version:\t" + tlsVersion);
+            Console.WriteLine("Networkmode:\t" + tlsVersion);
+            Console.WriteLine("Handshakemode:\t" + tlsVersion);
 
-            CsvConverter converter = new(inputPath, outputPath, version, handshakeMode, networkMode);
-            await converter.Run();            
+            CsvConverterConfig config = new(inputPath, outputPath, tlsVersion, handshakeMode, networkMode);
+            CsvConverter converter = new(config);
+            await converter.Run();
         }
     }
 }

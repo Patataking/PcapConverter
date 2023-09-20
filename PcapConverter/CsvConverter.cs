@@ -1,62 +1,34 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Security.Permissions;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace PcapConverter
-{
-    enum Version
-    {
-        old,  // OpenSSL Version 1.0.1j
-        current     // OpenSSL Version 3.1.1
-    }
-
-    enum HandshakeMode
-    {
-        partial, // only look at the part of the handshake containing the side channel
-        full
-    }
-    enum NetworkMode
-    {
-        network,
-        local
-    }
-
+﻿namespace PcapConverter
+{  
     internal class CsvConverter
     {
         // Amount of erroneous .pcap files
         private int erroneousFiles = 0;
-        // Amount of partial connections
+        // Amount of partial connections e.g. connections that lack the last package
         private int partialConnections = 0;
-        // Amount of negative deltas
+        // Amount of negative deltas e.g. connections where the ending package has an invalid timestamp 
         private int negativeDeltas = 0;
         // Amount of written datasets
         private int writtenDatasets = 0;
-        private readonly string InputPath;
-        private readonly string OutputPath;
-        private readonly Version Version;
-        private readonly HandshakeMode HandshakeMode;
-        private readonly NetworkMode NetworkMode;
+        public readonly CsvConverterConfig Config;
 
-        public CsvConverter(string inputPath, string outputPath, Version version, HandshakeMode handshakeMode, NetworkMode networkMode)
+        public CsvConverter(string inputPath, string outputPath, TlsVersion version, HandshakeMode handshakeMode, NetworkMode networkMode)
         {
-            InputPath = inputPath ?? throw new ArgumentNullException(nameof(inputPath));
-            OutputPath = outputPath ?? throw new ArgumentNullException(nameof(outputPath));
-            Version = version;
-            HandshakeMode = handshakeMode;
-            NetworkMode = networkMode;
+            Config = new CsvConverterConfig(inputPath, outputPath, version, handshakeMode, networkMode);
+        }
+
+        public CsvConverter(CsvConverterConfig config)
+        {
+            Config = config;
         }
 
         public async Task Run()
         {
             // Get all subdirectories of input directory
-            var directories = Directory.GetDirectories(InputPath).ToList();
+            var directories = Directory.GetDirectories(Config.InputPath).ToList();
             var tasks = new List<Task<List<string>>>();
 
-            // Go through all subdirectories & start a task for each to calculate deltas from .pcap files.
+            // Go through all subdirectories & start a task for each to calculate deltas from .pcap files
             directories.ForEach(directoryPath =>
             {
                 tasks.Add(CsvFromFolderToDeltasAsync(directoryPath));
@@ -85,11 +57,12 @@ namespace PcapConverter
                 // Ensure that no incomplete set is written.
                 if (dataSet.Count == 10000)
                 {
-                    File.WriteAllLines(OutputPath + $"\\{writtenDatasets}.txt", dataSet);
+                    File.WriteAllLines(Config.OutputPath + $"\\{writtenDatasets}.txt", dataSet);
                     writtenDatasets++;
                 };
             });
 
+            // Print information about dataset
             Console.WriteLine($"Invalid .pcap files: {erroneousFiles}");
             Console.WriteLine($"Written datasets: {writtenDatasets - 1}");
             Console.WriteLine($"Dropped deltas: {deltas.Count % 10000}");
@@ -128,7 +101,7 @@ namespace PcapConverter
             
             // Retrieve packages from file. 
             packageList = File.ReadAllLines(path)
-                            .Select(v => Package.FromCsv(v, NetworkMode == NetworkMode.network))
+                            .Select(v => Package.FromCsv(v, Config.NetworkMode == NetworkMode.network))
                             .ToList();
 
             var (startPackage, endPackage) = GetStartingAndEndingPackages(packageList);
@@ -183,8 +156,9 @@ namespace PcapConverter
         /// <param name="startPackage"></param>
         /// <param name="endPackage"></param>
         /// <returns></returns>
-        private bool ValidatePcap(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage) => NetworkMode switch
+        private bool ValidatePcap(IEnumerable<Package> startPackage, IEnumerable<Package> endPackage) => Config.NetworkMode switch
         {
+            // Network mode may have multiple Connection per packet capture. Only the first connection is validated. Later connections might result in negative deltas.
             NetworkMode.network =>
                 startPackage.Any() && endPackage.Any()
                 && startPackage.First().Index < endPackage.First().Index,
@@ -203,10 +177,10 @@ namespace PcapConverter
             IEnumerable<Package> startPackage;
             IEnumerable<Package> endPackage;
 
-            switch (Version)
+            switch (Config.TlsVersion)
             {
                 default:
-                case Version.old:
+                case TlsVersion.two:
                     startPackage = from package in packageList
                                    where package.Info.StartsWith("TLSv1") && package.Info.Contains("Client Hello")
                                    select package;
@@ -214,17 +188,15 @@ namespace PcapConverter
                     endPackage = from package in packageList
                                  where package.Info.StartsWith("TLSv1.2")
                                     // The last package differs depending on whether a partial or full handshake is beeing analyzed.
-                                    && HandshakeMode switch
+                                    && Config.HandshakeMode switch
                                     {                                        
                                         HandshakeMode.full => package.Info.Contains("New Session Ticket, Change Cipher Spec, Encrypted Handshake Message"),
                                         _ or HandshakeMode.partial => package.Info.Contains("Server Hello, Certificate, Server Key Exchange, Server Hello Done")
                                     }
                                  select package;
                     break;
-                case Version.current: // TODO
-                    startPackage = new List<Package>();
-                    endPackage = new List<Package>();
-                    break;
+                case TlsVersion.three: // TODO
+                    throw new NotImplementedException();
             }
 
             return (startPackage, endPackage);
