@@ -80,8 +80,8 @@
             List<double> deltas = new();
 
             await Task.Run(() => Directory.GetFiles(folder, "*.csv").ToList().ForEach(f => deltas.AddRange(CsvToDelta(f))));
-
-            // Remove all null entries
+            
+            // Convert to list of strings
             var timeDeltas = from delta in deltas
                              select delta.ToString();
 

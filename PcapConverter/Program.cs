@@ -52,14 +52,18 @@ namespace PcapConverter
                     break;
             }
 
-            if (!Directory.Exists(inputPath))
+            while (!Directory.Exists(inputPath))
             {
-                throw new Exception("InputPath doesn't exist:\t" + inputPath);
+                Console.WriteLine("InputPath doesn't exist:\t" + inputPath);
+                Console.WriteLine("Enter input path");
+                inputPath = @"" + Console.ReadLine();
             }
 
-            if (!Directory.Exists(outputPath))
+            while (!Directory.Exists(outputPath))
             {
-                throw new Exception("OutputPath doesn't exist:\t" + outputPath);
+                Console.WriteLine("OutputPath doesn't exist:\t" + outputPath);
+                Console.WriteLine("Enter output path");
+                outputPath = @"" + Console.ReadLine();
             }
 
             // Check TLS version; defaults to TLS 1.2
